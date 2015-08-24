@@ -1,3 +1,7 @@
+v 0.1.0
+===============
+Various fixes for broken links and text
+
 v 0.0.1
 ===============
 Initial prototype build
