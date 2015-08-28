@@ -1,7 +1,5 @@
 # TODO: Include a # filter in the Anime by Alphabet
 #		Refactor href in a lot of places. It's really an endpoint string
-#		A lot of the menu building feels like it could be simplified more
-#		Should I use a class for something so small?
 import sys
 import xbmc
 import xbmcgui
@@ -39,6 +37,14 @@ def toList( data ):
     	
     return theList 
 	
+def addDirectoryItem( urlParams, title, img, isFolder ):
+    url = build_url( urlParams )
+    li = xbmcgui.ListItem( title, iconImage=img, thumbnailImage=img )
+    xbmcplugin.addDirectoryItem( addon_handle, url, li, isFolder )
+
+def getImgURL( showID ):
+    return 'http://images.animebaka.tv/a_lth/' + showID + '_lth.jpg' #large thumb
+    
 def build_url( query ):
     return sys.argv[0] + '?' + urllib.urlencode( query )
     
@@ -47,79 +53,57 @@ def fixEncoding( str ): #YQL turns ' into &#039;, that needs to be undone
     
 def fixHREF( str ):
     return urllib.quote( fixEncoding( str ) )
+
+def YQL_Links( endpoint, xpath ):
+    json    = YQL( endpoint, xpath )
+    As      = []
     
-def YQL( url, xpath ): # run a query against YQL, returns a content JSON
-    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20html%20where%20url=%22' + url  + '%22%20and%20xpath=%27' + xpath + '%27' )
+    if json[ 'query' ][ 'results' ] != None:
+        As = toList( json[ 'query' ][ 'results' ][ 'a' ] ) #YQL doesn't return an array if only 1 result, make list for list item building 
+    
+    return As
+
+def YQL( endpoint, xpath ): #shorthand version that prepends base_url
+    return YQL_fullURL( base_url + endpoint, xpath )
+       
+def YQL_fullURL( url, xpath ): # run a query against YQL, returns a content JSON
+    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20html%20where%20url=%22' + url + '%22%20and%20xpath=%27' + xpath + '%27' )
     reqContent = urllib2.urlopen( req )
     
     return json.load( reqContent, 'utf-8' )
 	
 def buildBrowseMenu( endpoint ): #Builds a menu of shows based on the specified collection
     if 'filterAlpha' in args: #run a different YQL if alpha filtering
-        showsJSON = YQL( base_url + endpoint, '//a[contains(@class,%22show%22)][contains(@href,%22/anime/' + args['filterAlpha'][0] + '%22)]' )
+        xpath = '//a[contains(@class,%22show%22)][contains(@href,%22/anime/' + args['filterAlpha'][0] + '%22)]'
     else:
-        showsJSON = YQL( base_url + endpoint, '//a[contains(@class,%22show%22)]' )
-    
-    if showsJSON[ 'query' ][ 'results' ] != None:
-    	showsA = toList( showsJSON[ 'query' ][ 'results' ][ 'a' ] ) #YQL doesn't return an array if only 1 result, make list for list item building
-    	
-    	for show in showsA:
-            url = build_url( {'mode': 'list', 'href': fixEncoding( show['href'] ) } )
-            img = 'http://images.animebaka.tv/a_lth/' + show['data-show-id'] + '_lth.jpg'
-            li = xbmcgui.ListItem( show['span']['content'], iconImage=img, thumbnailImage=img )
-            xbmcplugin.addDirectoryItem( addon_handle, url, li, True )
-		
-def buildGenresMenu(): #Menu of Genres
-    genresJSON = YQL( 'http://animebaka.tv/browse/genres', '//a[contains(@href,%22/browse/genre%22)][contains(@class,%22btn%22)]' )
-    genresA = genresJSON[ 'query' ][ 'results' ][ 'a' ]
-    
-    for genre in genresA:
-        label = genre['content'].replace( ' Shows', '')
-        url = build_url( {'mode': 'browse', 'href': fixEncoding( genre['href'] )} )
-        li  = xbmcgui.ListItem( label, iconImage='DefaultFolder.png' )
-        xbmcplugin.addDirectoryItem( addon_handle, url, li, True )
-			
-def buildTypesMenu(): #Menu of Video types, from the Type filter
-    typesJSON = YQL( 'http://animebaka.tv/browse/shows', '//a[contains(@href,%22/browse/type/%22)]' )
-    if typesJSON[ 'query' ][ 'results' ] != None:
-        typesA = typesJSON[ 'query' ][ 'results' ][ 'a' ]
-        
-        for type in typesA:
-            if 'content' in type:
-                label = type['content']
-                    
-                url = build_url( {'mode': 'browse', 'href': fixEncoding( type['href'] ) } ) 
-                li  = xbmcgui.ListItem( label, iconImage='DefaultFolder.png' )
-                xbmcplugin.addDirectoryItem( addon_handle, url, li, True )
+        xpath = '//a[contains(@class,%22show%22)]'
 
-def buildAlphaMenu(): #Menu of Alpha filters, does not include the # filter yet
-	for c in ascii_lowercase:
-		url = build_url( {'mode': 'browse', 'href': '/browse/shows', 'filterAlpha': c } )
-		li  = xbmcgui.ListItem( c.upper(), iconImage='DefaultFolder.png' )
-		xbmcplugin.addDirectoryItem( addon_handle, url, li, True )
+    for show in YQL_Links( endpoint, xpath ):
+        addDirectoryItem( {'mode': 'list', 'href': fixEncoding( show['href'] ) }, show['span']['content'], getImgURL( show['data-show-id'] ), True )
 		
 #Start Mode support
 if mode is None: #Default View, uses defaultOpts to build menu
     for opt in defaultOpts:
         if 'mode' in opt:
             modeStr = opt['mode']
-
         else:
             modeStr = 'browse'
         
-        url = build_url( {'mode': modeStr, 'href': opt['href'] } ) 
-        li  = xbmcgui.ListItem( opt['label'], iconImage='DefaultFolder.png' )
-        xbmcplugin.addDirectoryItem( addon_handle, url, li, True )
+        addDirectoryItem( {'mode': modeStr, 'href': opt['href'] }, opt['label'], 'DefaultFolder.png', True )
 		
 elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
-    if args['href'][0] == 'genres':
-        buildGenresMenu()
+    if args['href'][0] == 'genres': #Menu of Genres
+        for genre in YQL_Links( '/browse/genres', '//a[contains(@href,%22/browse/genre%22)][contains(@class,%22btn%22)]' ):
+            addDirectoryItem( {'mode': 'browse', 'href': fixEncoding( genre['href'] )}, genre['content'].replace( ' Shows', ''), 'DefaultFolder.png', True )
 
-    elif args['href'][0] == 'types':
-        buildTypesMenu()
+    elif args['href'][0] == 'types': #Menu of Video types, from the Type filter
+        for type in YQL_Links( '/browse/shows', '//a[contains(@href,%22/browse/type/%22)]' ):
+            if 'content' in type:
+                addDirectoryItem( {'mode': 'browse', 'href': fixEncoding( type['href'] ) }, type['content'], 'DefaultFolder.png', True )
 	
-    elif args['href'][0] == 'filter':
-        buildAlphaMenu();
+    elif args['href'][0] == 'filter': #Menu of Alpha filters, does not include the # filter yet
+        for c in ascii_lowercase:
+            addDirectoryItem( {'mode': 'browse', 'href': '/browse/shows', 'filterAlpha': c }, c.upper(), 'DefaultFolder.png', True )
 		
     else:
         buildBrowseMenu( args['href'][0] )
@@ -130,54 +114,32 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     else:
         page = 1
     
-    episodesJSON = YQL( 'http://animebaka.tv/?page=' + str( page ), '//div[contains(@class,"release-wrapper")]/a[contains(@class,"poster")]' )
-    
-    if episodesJSON[ 'query' ][ 'results' ] != None:
-        episodesA = toList( episodesJSON[ 'query' ][ 'results' ][ 'a' ] )
+    for episode in YQL_Links( '/?page=' + str( page ), '//div[contains(@class,"release-wrapper")]/a[contains(@class,"poster")]' ):
+        #JSON varies a bit from series listing of episodes, so cannot exactly resuse
+        addDirectoryItem( {'mode': 'watch', 'href': fixHREF( episode['href'] ) }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), False )
         
-        for episode in episodesA:
-            #JSON varies a bit from series listing of episodes, so cannot exactly resuse
-            url = build_url( {'mode': 'watch', 'href': fixHREF( episode['href'] ) } ) 
-            
-            img = "http:" + episode['img']['src'].replace( 'lcap', 'lth' )#use the big thumb, also src lacks http:
-            li  = xbmcgui.ListItem( episode['img']['alt'], iconImage=img, thumbnailImage=img ) 
-            xbmcplugin.addDirectoryItem( addon_handle, url, li )
-            
-        #Add a More link to get more results
-        page += 1
-        url = build_url( { 'mode': 'latest', 'page': str( page ) } ) 
-        li = xbmcgui.ListItem( 'More', iconImage='DefaultFolder.png' )
-        xbmcplugin.addDirectoryItem( addon_handle, url, li, True )
+    #Add a More link to get more results
+    page += 1
+    addDirectoryItem( { 'mode': 'latest', 'page': str( page ) }, 'More', 'DefaultFolder.png', True )
      
 elif mode[0] == 'list': #List videos linked at the series/movie endpoint
     href = fixHREF( args['href'][0] )
     
     #Having problems with URLs that have a + in them. Though they end up as whitespaces for some wierd reason. Hacky replacement with a %2B
-    episodesJSON = YQL( base_url + href , '//td[contains(@class,%22episode%22)]/a' )
-    
-    if episodesJSON[ 'query' ][ 'results' ] != None:
-        episodesA = toList( episodesJSON[ 'query' ][ 'results' ][ 'a' ] ) #make sure it's a list, YQL makes single results an object
-  
-        for episode in episodesA:
-            url = build_url( { 'mode': 'watch', 'href': fixHREF( episode['href'] ) } ) 
-            
-            if isinstance( episode['span'], list ) is True:
-                title = episode['span'][0]['content'] + ' - ' + episode['span'][1]['content']
-            else:
-                title = episode['span']['content']
-			
-            li  = xbmcgui.ListItem( title, iconImage='DefaultVideo.png')
-            xbmcplugin.addDirectoryItem( addon_handle, url, li )
+    for episode in YQL_Links( href , '//td[contains(@class,%22episode%22)]/a' ):
+        if isinstance( episode['span'], list ) is True:
+            addDirectoryItem( { 'mode': 'watch', 'href': fixHREF( episode['href'] ) }, episode['span'][0]['content'] + ' - ' + episode['span'][1]['content'], 'DefaultVideo.png', False )
+        else:
+            addDirectoryItem( { 'mode': 'watch', 'href': fixHREF( episode['href'] ) }, episode['span']['content'], 'DefaultVideo.png', False )
 		
 elif mode[0] == 'watch': #Watch the selected show from list view
     #Determine the Download page URL
     href = args['href'][0]
-    print( href )
-    watchDLJSON = YQL( base_url + href, '//a[contains(@class,%22download%22)]' ) #scrape the download link from player foot area
+    watchDLJSON = YQL( href, '//a[contains(@class,%22download%22)]' ) #scrape the download link from player foot area
     watchDLURL = watchDLJSON['query']['results']['a']['href']
     
     #Extract the direct download link URL from Download page, then play that URL
-    dlJSON = YQL( watchDLURL.encode('utf-8'), '//a[contains(@id,%22download%22)]' ) #scrape the file link on file host
+    dlJSON = YQL_fullURL( watchDLURL.encode('utf-8'), '//a[contains(@id,%22download%22)]' ) #scrape the file link on file host
     url = dlJSON['query']['results']['a']['href']
     xbmc.Player().play( url )
 	
