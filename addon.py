@@ -140,7 +140,7 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
             url = build_url( {'mode': 'watch', 'href': fixHREF( episode['href'] ) } ) 
             
             img = "http:" + episode['img']['src'].replace( 'lcap', 'lth' )#use the big thumb, also src lacks http:
-            li  = xbmcgui.ListItem( img['alt'], iconImage=img, thumbnailImage=img ) 
+            li  = xbmcgui.ListItem( episode['img']['alt'], iconImage=img, thumbnailImage=img ) 
             xbmcplugin.addDirectoryItem( addon_handle, url, li )
             
         #Add a More link to get more results
