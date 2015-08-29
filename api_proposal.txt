@@ -1,0 +1,62 @@
+This is a proposal for an Animebaka.tv api. Most endpoints share the same output schema.
+
+api/<filter type> - common format for following filter lists
+    - api/genres
+    - api/types
+    - api/alpha (first character Alpha filter)
+    
+api/<filter type>/<filter key> - common format to retrieve shows in filter type, same format as parent
+    - api/genres/<genre key>
+    - api/types/<type key>
+    - api/alpha/<alpha key> (first character Alpha filter)
+    
+api/latest/<page> - paged results of latest updates
+
+=======================================================
+[ 
+    {   
+        "title": "Action", 
+        "endpoint": "<url to get shows, ex: 'api/<filter type>/<filter key>'>", 
+        "description": "<short description>", 
+        "thumbs": { //nice to have
+            "large": "<url of large thumb>", 
+            "small": "<url of small thumb>" 
+        }
+    },
+    ...
+]
+
+api/videos/<show key> - endpoint to get video list
+===================================================
+{
+    "show": {
+        "title": "<show title">,
+        "endpoint": "<url to get videos, ex: 'api/videos/<show key>'>", 
+        "description": "<short description>", 
+        "thumbs": { 
+            "large": "<url of large thumb>", 
+            "small": "<url of small thumb>" 
+        }
+    },
+    "videos": [ //episode list or what have you
+        {
+            "title": "<video title>",
+            "description": "<short description>",
+            "thumbs": { 
+                "large": "<url of large thumb>", 
+                "small": "<url of small thumb>" 
+            },
+            "videos": [
+                {
+                    "url": "<playable url of video file>",
+                    "quality": "<HD or SD>",
+                    "subLang": "<language of subtitles>",
+                    "isDub":    "<true/false>"
+                },
+                ...
+            ]
+        },
+        ....
+    ]
+}
+        

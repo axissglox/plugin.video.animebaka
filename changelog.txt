@@ -1,3 +1,8 @@
+v 0.1.1
+===============
+Code refactoring and simplification
+Misc fixes to broken text, links, etc.
+
 v 0.1.0
 ===============
 Various fixes for broken links and text

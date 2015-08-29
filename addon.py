@@ -1,11 +1,12 @@
 # TODO: Include a # filter in the Anime by Alphabet
-#		Refactor href in a lot of places. It's really an endpoint string
+#		Fix special characters like star display
 import sys
 import xbmc
 import xbmcgui
 import xbmcplugin
 
 import json
+import HTMLParser
 import urllib
 import urllib2
 import urlparse
@@ -39,20 +40,20 @@ def toList( data ):
 	
 def addDirectoryItem( urlParams, title, img, isFolder ):
     url = build_url( urlParams )
-    li = xbmcgui.ListItem( title, iconImage=img, thumbnailImage=img )
+    li = xbmcgui.ListItem( fixEncoding( title ), iconImage=img, thumbnailImage=img )
     xbmcplugin.addDirectoryItem( addon_handle, url, li, isFolder )
 
 def getImgURL( showID ):
     return 'http://images.animebaka.tv/a_lth/' + showID + '_lth.jpg' #large thumb
     
 def build_url( query ):
+    if 'href' in query:
+        query['href'] = fixEncoding( query['href'] )
+        
     return sys.argv[0] + '?' + urllib.urlencode( query )
     
-def fixEncoding( str ): #YQL turns ' into &#039;, that needs to be undone
-    return str.encode('utf-8').replace( "&#039;", "\'" ) 
-    
-def fixHREF( str ):
-    return urllib.quote( fixEncoding( str ) )
+def fixEncoding( str ): #YQL turns ' into &#039;, that needs to be undone 
+    return HTMLParser.HTMLParser().unescape( str.encode('utf-8') ) 
 
 def YQL_Links( endpoint, xpath ):
     json    = YQL( endpoint, xpath )
@@ -67,7 +68,7 @@ def YQL( endpoint, xpath ): #shorthand version that prepends base_url
     return YQL_fullURL( base_url + endpoint, xpath )
        
 def YQL_fullURL( url, xpath ): # run a query against YQL, returns a content JSON
-    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20html%20where%20url=%22' + url + '%22%20and%20xpath=%27' + xpath + '%27' )
+    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20html%20where%20url=%22' + urllib.quote( url ) + '%22%20and%20xpath=%27' + xpath + '%27' )
     reqContent = urllib2.urlopen( req )
     
     return json.load( reqContent, 'utf-8' )
@@ -79,7 +80,7 @@ def buildBrowseMenu( endpoint ): #Builds a menu of shows based on the specified 
         xpath = '//a[contains(@class,%22show%22)]'
 
     for show in YQL_Links( endpoint, xpath ):
-        addDirectoryItem( {'mode': 'list', 'href': fixEncoding( show['href'] ) }, show['span']['content'], getImgURL( show['data-show-id'] ), True )
+        addDirectoryItem( {'mode': 'list', 'href': show['href'] }, show['span']['content'], getImgURL( show['data-show-id'] ), True )
 		
 #Start Mode support
 if mode is None: #Default View, uses defaultOpts to build menu
@@ -94,12 +95,12 @@ if mode is None: #Default View, uses defaultOpts to build menu
 elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
     if args['href'][0] == 'genres': #Menu of Genres
         for genre in YQL_Links( '/browse/genres', '//a[contains(@href,%22/browse/genre%22)][contains(@class,%22btn%22)]' ):
-            addDirectoryItem( {'mode': 'browse', 'href': fixEncoding( genre['href'] )}, genre['content'].replace( ' Shows', ''), 'DefaultFolder.png', True )
+            addDirectoryItem( {'mode': 'browse', 'href': genre['href']}, genre['content'].replace( ' Shows', ''), 'DefaultFolder.png', True )
 
     elif args['href'][0] == 'types': #Menu of Video types, from the Type filter
         for type in YQL_Links( '/browse/shows', '//a[contains(@href,%22/browse/type/%22)]' ):
             if 'content' in type:
-                addDirectoryItem( {'mode': 'browse', 'href': fixEncoding( type['href'] ) }, type['content'], 'DefaultFolder.png', True )
+                addDirectoryItem( {'mode': 'browse', 'href': type['href'] }, type['content'], 'DefaultFolder.png', True )
 	
     elif args['href'][0] == 'filter': #Menu of Alpha filters, does not include the # filter yet
         for c in ascii_lowercase:
@@ -116,21 +117,18 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     
     for episode in YQL_Links( '/?page=' + str( page ), '//div[contains(@class,"release-wrapper")]/a[contains(@class,"poster")]' ):
         #JSON varies a bit from series listing of episodes, so cannot exactly resuse
-        addDirectoryItem( {'mode': 'watch', 'href': fixHREF( episode['href'] ) }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), False )
+        addDirectoryItem( {'mode': 'watch', 'href': episode['href'] }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), False )
         
     #Add a More link to get more results
     page += 1
     addDirectoryItem( { 'mode': 'latest', 'page': str( page ) }, 'More', 'DefaultFolder.png', True )
      
 elif mode[0] == 'list': #List videos linked at the series/movie endpoint
-    href = fixHREF( args['href'][0] )
-    
-    #Having problems with URLs that have a + in them. Though they end up as whitespaces for some wierd reason. Hacky replacement with a %2B
-    for episode in YQL_Links( href , '//td[contains(@class,%22episode%22)]/a' ):
+    for episode in YQL_Links( args['href'][0] , '//td[contains(@class,%22episode%22)]/a' ):
         if isinstance( episode['span'], list ) is True:
-            addDirectoryItem( { 'mode': 'watch', 'href': fixHREF( episode['href'] ) }, episode['span'][0]['content'] + ' - ' + episode['span'][1]['content'], 'DefaultVideo.png', False )
+            addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, episode['span'][0]['content'] + ' - ' + episode['span'][1]['content'], 'DefaultVideo.png', False )
         else:
-            addDirectoryItem( { 'mode': 'watch', 'href': fixHREF( episode['href'] ) }, episode['span']['content'], 'DefaultVideo.png', False )
+            addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, episode['span']['content'], 'DefaultVideo.png', False )
 		
 elif mode[0] == 'watch': #Watch the selected show from list view
     #Determine the Download page URL
@@ -139,7 +137,7 @@ elif mode[0] == 'watch': #Watch the selected show from list view
     watchDLURL = watchDLJSON['query']['results']['a']['href']
     
     #Extract the direct download link URL from Download page, then play that URL
-    dlJSON = YQL_fullURL( watchDLURL.encode('utf-8'), '//a[contains(@id,%22download%22)]' ) #scrape the file link on file host
+    dlJSON = YQL_fullURL( watchDLURL, '//a[contains(@id,%22download%22)]' ) #scrape the file link on file host
     url = dlJSON['query']['results']['a']['href']
     xbmc.Player().play( url )
 	
