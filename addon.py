@@ -29,14 +29,6 @@ defaultOpts = (
     { 'label': 'Video by Type', 'href': 'types' },
     { 'label': 'Movies', 'href': '/browse/type/movie' }    
 )
-
-def toList( data ):
-    theList = data
-    
-    if isinstance( data, list ) is False: #only turn into a list if it's not
-    	theList = [ data ]
-    	
-    return theList 
 	
 def addDirectoryItem( urlParams, title, img, isFolder ):
     url = build_url( urlParams )
@@ -55,33 +47,25 @@ def build_url( query ):
 def fixEncoding( str ): #YQL turns ' into &#039;, that needs to be undone 
     return HTMLParser.HTMLParser().unescape( str.encode('utf-8') ) 
 
-def YQL_Links( endpoint, xpath ):
-    json    = YQL( endpoint, xpath )
-    As      = []
-    
-    if json[ 'query' ][ 'results' ] != None:
-        As = toList( json[ 'query' ][ 'results' ][ 'a' ] ) #YQL doesn't return an array if only 1 result, make list for list item building 
-    
-    return As
-
-def YQL( endpoint, xpath ): #shorthand version that prepends base_url
-    return YQL_fullURL( base_url + endpoint, xpath )
-       
-def YQL_fullURL( url, xpath ): # run a query against YQL, returns a content JSON
-    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20html%20where%20url=%22' + urllib.quote( url ) + '%22%20and%20xpath=%27' + xpath + '%27' )
+def getYQLAlias( alias, query={} ):
+    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql/animebaka_show/animebaka_' + alias + '?format=json&' + urllib.urlencode( query ) )
     reqContent = urllib2.urlopen( req )
+    results = json.load( reqContent, 'utf-8' )
     
-    return json.load( reqContent, 'utf-8' )
-	
-def buildBrowseMenu( endpoint ): #Builds a menu of shows based on the specified collection
-    if 'filterAlpha' in args: #run a different YQL if alpha filtering
-        xpath = '//a[contains(@class,%22show%22)][contains(@href,%22/anime/' + args['filterAlpha'][0] + '%22)]'
-    else:
-        xpath = '//a[contains(@class,%22show%22)]'
+    links      = []
+    if results[ 'query' ][ 'results' ] != None:
+        links = toList( results[ 'query' ][ 'results' ][ 'a' ] ) #YQL doesn't return an array if only 1 result, make list for list item building 
+    
+    return links
 
-    for show in YQL_Links( endpoint, xpath ):
-        addDirectoryItem( {'mode': 'list', 'href': show['href'] }, show['span']['content'], getImgURL( show['data-show-id'] ), True )
-		
+def toList( data ): #TODO: eliminate, only used in 1 place
+    theList = data
+    
+    if isinstance( data, list ) is False: #only turn into a list if it's not
+        theList = [ data ]
+        
+    return theList 
+  	
 #Start Mode support
 if mode is None: #Default View, uses defaultOpts to build menu
     for opt in defaultOpts:
@@ -94,11 +78,11 @@ if mode is None: #Default View, uses defaultOpts to build menu
 		
 elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
     if args['href'][0] == 'genres': #Menu of Genres
-        for genre in YQL_Links( '/browse/genres', '//a[contains(@href,%22/browse/genre%22)][contains(@class,%22btn%22)]' ):
+        for genre in getYQLAlias( 'genres' ):
             addDirectoryItem( {'mode': 'browse', 'href': genre['href']}, genre['content'].replace( ' Shows', ''), 'DefaultFolder.png', True )
 
     elif args['href'][0] == 'types': #Menu of Video types, from the Type filter
-        for type in YQL_Links( '/browse/shows', '//a[contains(@href,%22/browse/type/%22)]' ):
+        for type in getYQLAlias( 'types' ):
             if 'content' in type:
                 addDirectoryItem( {'mode': 'browse', 'href': type['href'] }, type['content'], 'DefaultFolder.png', True )
 	
@@ -107,7 +91,14 @@ elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
             addDirectoryItem( {'mode': 'browse', 'href': '/browse/shows', 'filterAlpha': c }, c.upper(), 'DefaultFolder.png', True )
 		
     else:
-        buildBrowseMenu( args['href'][0] )
+        filterAlpha = ''
+        
+        if 'filterAlpha' in args: #run a different YQL if alpha filtering
+            filterAlpha = args['filterAlpha'][0]
+        
+        for show in getYQLAlias( 'shows_all' ):
+            if show['href'].find( '/anime/' + filterAlpha ) >= 0:
+                addDirectoryItem( {'mode': 'list', 'href': show['href'] }, show['span']['content'], getImgURL( show['data-show-id'] ), True )
 	
 elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     if 'page' in args:
@@ -115,8 +106,7 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     else:
         page = 1
     
-    for episode in YQL_Links( '/?page=' + str( page ), '//div[contains(@class,"release-wrapper")]/a[contains(@class,"poster")]' ):
-        #JSON varies a bit from series listing of episodes, so cannot exactly resuse
+    for episode in getYQLAlias( 'latest', { 'pageHREF': base_url + '/?page=' + str( page ) } ):
         addDirectoryItem( {'mode': 'watch', 'href': episode['href'] }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), False )
         
     #Add a More link to get more results
@@ -124,7 +114,7 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     addDirectoryItem( { 'mode': 'latest', 'page': str( page ) }, 'More', 'DefaultFolder.png', True )
      
 elif mode[0] == 'list': #List videos linked at the series/movie endpoint
-    for episode in YQL_Links( args['href'][0] , '//td[contains(@class,%22episode%22)]/a' ):
+    for episode in getYQLAlias( 'list', {'showHREF':  base_url + args['href'][0]} ):
         if isinstance( episode['span'], list ) is True:
             addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, episode['span'][0]['content'] + ' - ' + episode['span'][1]['content'], 'DefaultVideo.png', False )
         else:
@@ -133,12 +123,9 @@ elif mode[0] == 'list': #List videos linked at the series/movie endpoint
 elif mode[0] == 'watch': #Watch the selected show from list view
     #Determine the Download page URL
     href = args['href'][0]
-    watchDLJSON = YQL( href, '//a[contains(@class,%22download%22)]' ) #scrape the download link from player foot area
-    watchDLURL = watchDLJSON['query']['results']['a']['href']
+    watchDLURL = getYQLAlias( 'download_link', {'videoHREF': base_url + href} )[0]['href'] #scrape the download link from player foot area
     
     #Extract the direct download link URL from Download page, then play that URL
-    dlJSON = YQL_fullURL( watchDLURL, '//a[contains(@id,%22download%22)]' ) #scrape the file link on file host
-    url = dlJSON['query']['results']['a']['href']
-    xbmc.Player().play( url )
+    xbmc.Player().play( getYQLAlias( 'download_video', {'videoHREF': watchDLURL} )[0]['href'] ) #scrape the file link on file host and play
 	
 xbmcplugin.endOfDirectory( addon_handle )
