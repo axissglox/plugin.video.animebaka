@@ -1,11 +1,11 @@
-# TODO: Include a # filter in the Anime by Alphabet
-#		Fix special characters like star display
+# TODO: Fix special characters like star display
 import sys
 import xbmc
 import xbmcgui
 import xbmcplugin
 
 import json
+import re
 import HTMLParser
 import urllib
 import urllib2
@@ -54,17 +54,11 @@ def getYQLAlias( alias, query={} ):
     
     links      = []
     if results[ 'query' ][ 'results' ] != None:
-        links = toList( results[ 'query' ][ 'results' ][ 'a' ] ) #YQL doesn't return an array if only 1 result, make list for list item building 
+        links = results[ 'query' ][ 'results' ][ 'a' ]
+        if isinstance( links, list ) is False: #YQL doesn't return an array if only 1 result, make list for list item building
+            links = [ links ]
     
     return links
-
-def toList( data ): #TODO: eliminate, only used in 1 place
-    theList = data
-    
-    if isinstance( data, list ) is False: #only turn into a list if it's not
-        theList = [ data ]
-        
-    return theList 
   	
 #Start Mode support
 if mode is None: #Default View, uses defaultOpts to build menu
@@ -87,17 +81,18 @@ elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
                 addDirectoryItem( {'mode': 'browse', 'href': type['href'] }, type['content'], 'DefaultFolder.png', True )
 	
     elif args['href'][0] == 'filter': #Menu of Alpha filters, does not include the # filter yet
+        addDirectoryItem( {'mode':'browse', 'href': '/browse/shows', 'filterAlpha': '[^a-zA-Z].*'}, '#', 'DefaultFolder.png', True ) #add a filter for shows starting without alpha
         for c in ascii_lowercase:
             addDirectoryItem( {'mode': 'browse', 'href': '/browse/shows', 'filterAlpha': c }, c.upper(), 'DefaultFolder.png', True )
 		
     else:
-        filterAlpha = ''
-        
         if 'filterAlpha' in args: #run a different YQL if alpha filtering
             filterAlpha = args['filterAlpha'][0]
-        
-        for show in getYQLAlias( 'shows_all' ):
-            if show['href'].find( '/anime/' + filterAlpha ) >= 0:
+        else:
+            filterAlpha = ''
+            
+        for show in getYQLAlias( 'browse', {'showsHREF': base_url + args['href'][0] }):
+            if re.match( '/anime/' + filterAlpha, show['href'] ):
                 addDirectoryItem( {'mode': 'list', 'href': show['href'] }, show['span']['content'], getImgURL( show['data-show-id'] ), True )
 	
 elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
@@ -109,23 +104,20 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     for episode in getYQLAlias( 'latest', { 'pageHREF': base_url + '/?page=' + str( page ) } ):
         addDirectoryItem( {'mode': 'watch', 'href': episode['href'] }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), False )
         
-    #Add a More link to get more results
-    page += 1
-    addDirectoryItem( { 'mode': 'latest', 'page': str( page ) }, 'More', 'DefaultFolder.png', True )
+    addDirectoryItem( { 'mode': 'latest', 'page': str( page + 1 ) }, 'More', 'DefaultFolder.png', True ) #Add a More link to get more results
      
 elif mode[0] == 'list': #List videos linked at the series/movie endpoint
     for episode in getYQLAlias( 'list', {'showHREF':  base_url + args['href'][0]} ):
         if isinstance( episode['span'], list ) is True:
-            addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, episode['span'][0]['content'] + ' - ' + episode['span'][1]['content'], 'DefaultVideo.png', False )
+            title = episode['span'][0]['content'] + ' - ' + episode['span'][1]['content']
         else:
-            addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, episode['span']['content'], 'DefaultVideo.png', False )
+            title = episode['span']['content']
+        
+        addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, title, 'DefaultVideo.png', False )
 		
 elif mode[0] == 'watch': #Watch the selected show from list view
     #Determine the Download page URL
-    href = args['href'][0]
-    watchDLURL = getYQLAlias( 'download_link', {'videoHREF': base_url + href} )[0]['href'] #scrape the download link from player foot area
-    
-    #Extract the direct download link URL from Download page, then play that URL
-    xbmc.Player().play( getYQLAlias( 'download_video', {'videoHREF': watchDLURL} )[0]['href'] ) #scrape the file link on file host and play
+    videoHREF = getYQLAlias( 'download_link', {'videoHREF': base_url + args['href'][0] } )[0]['href'] #scrape the download link from player foot area
+    xbmc.Player().play( getYQLAlias( 'download_video', {'videoHREF': videoHREF } )[0]['href'] ) #scrape the file link on file host and play
 	
 xbmcplugin.endOfDirectory( addon_handle )

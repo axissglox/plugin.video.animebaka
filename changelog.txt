@@ -1,3 +1,8 @@
+v 0.2.0
+===============
+changed scraping to use saved YQL alias
+misc fixes
+
 v 0.1.1
 ===============
 Code refactoring and simplification
