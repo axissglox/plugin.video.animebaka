@@ -30,10 +30,20 @@ defaultOpts = (
     { 'label': 'Movies', 'href': '/browse/type/movie' }    
 )
 	
-def addDirectoryItem( urlParams, title, img, isFolder ):
+def addDirectoryItem( urlParams, title, img, isFolder, streamInfo={} ):
     url = build_url( urlParams )
-    li = xbmcgui.ListItem( fixEncoding( title ), iconImage=img, thumbnailImage=img )
+    try:
+        li = xbmcgui.ListItem( fixEncoding( title ), iconImage=img, thumbnailImage=img )
+    except: #mirrors will cause an exceptions.UnicodeDecodeError
+        li = xbmcgui.ListItem( title, iconImage=img, thumbnailImage=img )
+
+    print( streamInfo )
+    for key, value in streamInfo.items():
+        li.addStreamInfo( key, value )
+
     xbmcplugin.addDirectoryItem( addon_handle, url, li, isFolder )
+
+    return li
 
 def getImgURL( showID ):
     return 'http://images.animebaka.tv/a_lth/' + showID + '_lth.jpg' #large thumb
@@ -60,6 +70,36 @@ def getYQLAlias( alias, query={} ):
     
     return links
   	
+def play( href ):
+    #Determine the Download page URL
+    videoHREF = getYQLAlias( 'download_link', {'videoHREF': base_url + href } )[0]['href'] #scrape the download link from player foot area
+    xbmc.Player().play( getYQLAlias( 'download_video', {'videoHREF': videoHREF } )[0]['href'] ) #scrape the file link on file host and play
+
+def extractStreamInfo( mirror ):
+    streamInfo = {}
+
+    if mirror['span'][0]['em'] == 'HD':
+        streamInfo['video'] = { 'width': '1280', 'height': '720' }
+    else:
+        streamInfo['video'] = { 'width': '640', 'height': '480' }
+
+    subDub = mirror['span'][ len( mirror['span'] ) - 1 ]['content']
+    if subDub == '[Subbed]':
+        streamInfo['subtitle'] = { 'language': 'en' }
+
+    return streamInfo
+
+def listMirrors( href, title ):
+    mirrors = getYQLAlias( 'video_mirrors', {'videoHREF': base_url + href } )
+
+    for mirror in getYQLAlias( 'video_mirrors', {'videoHREF': base_url + href } ):
+        streamInfo = extractStreamInfo( mirror )
+        subDub = mirror['span'][ len( mirror['span'] ) - 1 ]['content']
+
+        li = addDirectoryItem( {'mode': 'play', 'href': mirror['href'] }, title + ' ' + fixEncoding( subDub ), 'DefaultVideo.png', False, streamInfo )
+
+    return { 'mirrors': mirrors, 'li': li }
+
 #Start Mode support
 if mode is None: #Default View, uses defaultOpts to build menu
     for opt in defaultOpts:
@@ -102,22 +142,33 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
         page = 1
     
     for episode in getYQLAlias( 'latest', { 'pageHREF': base_url + '/?page=' + str( page ) } ):
-        addDirectoryItem( {'mode': 'watch', 'href': episode['href'] }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), False )
+        addDirectoryItem( {'mode': 'watch', 'href': episode['href'], 'title': fixEncoding( episode['img']['alt'] ) }, episode['img']['alt'], "http:" + episode['img']['src'].replace( 'lcap', 'lth' ), True )
         
     addDirectoryItem( { 'mode': 'latest', 'page': str( page + 1 ) }, 'More', 'DefaultFolder.png', True ) #Add a More link to get more results
      
 elif mode[0] == 'list': #List videos linked at the series/movie endpoint
-    for episode in getYQLAlias( 'list', {'showHREF':  base_url + args['href'][0]} ):
-        if isinstance( episode['span'], list ) is True:
-            title = episode['span'][0]['content'] + ' - ' + episode['span'][1]['content']
-        else:
-            title = episode['span']['content']
+    episodes = getYQLAlias( 'list', {'showHREF':  base_url + args['href'][0]} )
+
+    if len( episodes ) == 1: #Only one, advance to mirrors
+        listMirrors( fixEncoding( episodes[0]['href'] ), episodes[0]['span']['content'] )
         
-        addDirectoryItem( { 'mode': 'watch', 'href': episode['href'] }, title, 'DefaultVideo.png', False )
-		
-elif mode[0] == 'watch': #Watch the selected show from list view
-    #Determine the Download page URL
-    videoHREF = getYQLAlias( 'download_link', {'videoHREF': base_url + args['href'][0] } )[0]['href'] #scrape the download link from player foot area
-    xbmc.Player().play( getYQLAlias( 'download_video', {'videoHREF': videoHREF } )[0]['href'] ) #scrape the file link on file host and play
+    else:
+        for episode in episodes:
+            if isinstance( episode['span'], list ) is True:
+                title = episode['span'][0]['content'] + ' - ' + episode['span'][1]['content']
+            else:
+                title = episode['span']['content']
+
+            li = addDirectoryItem( { 'mode': 'watch', 'href': episode['href'], 'title': fixEncoding( title ) }, title, 'DefaultFolder.png', True )
+
+elif mode[0] == 'watch': #get available videos from video page
+    mirrorsInfo = listMirrors( args['href'][0], args['title'][0] )
+
+    if len( mirrorsInfo['mirrors'] ) == 1: #if only 1, play it
+        xbmcplugin.setResolvedUrl( addon_handle, False, mirrorsInfo['li'] )
+        play( args['href'][0] )
+
+elif mode[0] == 'play': #Watch the selected show from list view
+    play( args['href'][0] )
 	
 xbmcplugin.endOfDirectory( addon_handle )

@@ -1,3 +1,7 @@
+v 0.3.0
+===============
+added support to scrape all available mirrors of a video
+
 v 0.2.0
 ===============
 changed scraping to use saved YQL alias
