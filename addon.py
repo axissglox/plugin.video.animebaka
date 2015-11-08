@@ -6,6 +6,7 @@
 #GET /genres/{string} // String name of genre (spaces converted to underscores) (action|shounen_ai|sci-fi)
 #GET /type/movies	
 #GET /status/{string} // String name of status (ongoing|completed|upcoming)
+
 # TODO: Fix special characters like star display
 import sys
 import xbmc
