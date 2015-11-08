@@ -8,11 +8,17 @@ Animebaka.tv released an API! Plugin now relies on the Official API rather than 
 
 ###Browsing Videos/Shows
 Latest Releases - last several videos posted to Animebaka.tv
+
 All Shows - list of everything on Animebaka.tv. This is big
+
 Currently Airing - All shows marked Ongoing
+
 Filter by Alphabet - Filters based on first character in title. e.g. A for Akira, Akame ga Kill, etc.
+
 Genres - shows filtered by Genre
+
 Video by Type - shows filtered by type. e.g. Movie, Live Action, OVA, etc.
+
 Movies - shortcut to all videos of type Movie
 
 ###Mirror Support
