@@ -2,4 +2,4 @@
 
 A Kodi/XBMC plugin for streaming videos from Animebaka.tv.
 
-Currently scraping the website. A mod may be working on an API, which I hope comes through.
+API has been released by the owner and this plugin now uses said API to fetch all content.
