@@ -9,9 +9,6 @@ api/<filter type>/<filter key> - common format to retrieve shows in filter type,
     - api/genres/<genre key>
     - api/types/<type key>
     - api/alpha/<alpha key> (first character Alpha filter)
-    
-api/latest/<page> - paged results of latest updates
-
 =======================================================
 [ 
     {   
@@ -39,14 +36,14 @@ api/videos/<show key> - endpoint to get video list
         }
     },
     "videos": [ //episode list or what have you
-        {
+        {   //common data for the episode/movie/ova/etc.
             "title": "<video title>",
             "description": "<short description>",
             "thumbs": { 
                 "large": "<url of large thumb>", 
                 "small": "<url of small thumb>" 
             },
-            "videos": [
+            "files": [ //various mirrors and available resolutions
                 {
                     "url": "<playable url of video file>",
                     "quality": "<HD or SD>",
@@ -60,3 +57,27 @@ api/videos/<show key> - endpoint to get video list
     ]
 }
         
+api/latest/<page> - paged results of latest updates
+===================================================
+{
+    "nextPage": <page key of next page, undefined if does not exist>,
+    "videos": [ //page of video results
+        {   //common data for the episode/movie/ova/etc.
+            "title": "<video title>",
+            "description": "<short description>",
+            "thumbs": { 
+                "large": "<url of large thumb>", 
+                "small": "<url of small thumb>" 
+            },
+            "files": [ //various mirrors and available resolutions
+                {
+                    "url": "<playable url of video file>",
+                    "quality": "<HD or SD>",
+                    "subLang": "<language of subtitles>",
+                    "isDub":    "<true/false>"
+                },
+                ...
+            ]
+        },
+        ....
+    ] 
