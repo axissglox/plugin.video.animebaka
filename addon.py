@@ -37,7 +37,7 @@ bakavideo_base = 'https://bakavideo.tv/view/'
 defaultOpts = (
     { 'label': 'Latest Releases', 'href': 'latest', 'mode': 'latest' },
     { 'label': 'All Shows', 'href': 'shows' },
-    #{ 'label': 'Currently Airing', 'href': 'status/ongoing' }, #endpoint currently 404
+    { 'label': 'Currently Airing', 'href': 'shows/status/ongoing' },
     { 'label': 'Filter by Alphabet', 'href': 'filter' },
     { 'label': 'Genres', 'href': 'genres' },
     #{ 'label': 'Video by Type', 'href': 'types' }, #currently missing endpoint
