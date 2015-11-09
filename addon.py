@@ -100,6 +100,11 @@ def getAPI( endpoint ):
     
     return reqJSON['result']
 
+def linkRelated( collection, label ):
+    if isinstance( collection, dict ):
+        for showID in collection.keys():
+            addDirectoryItem( { 'mode': 'list', 'href': 'shows/' + showID, 'title': fixEncoding( collection[showID] ) }, label + ': ' + fixEncoding( collection[showID] ), getImgURL( showID ), True )
+
 def listMirrorsAPI( href, title ):
     episode = getAPI( href )
     
@@ -143,6 +148,15 @@ def getShowInfo( show ):
     video['plot'] = fixedSummary
     video['plotoutline'] = fixedSummary
     video['title'] = fixEncoding( show['title'] )
+    
+    if 'genres' in show: #TODO: Api format on genres is inconsistent. In some places it's a list, others it's a dict
+        genres = show['genres']
+        if isinstance( genres[0], dict ): #if an array of dict objects, convert to array of name strings
+            genres = []
+            for genre in show['genres']:
+                genres.append( genre['name'] )
+        
+        video['genre'] = ', '.join( genres )
         
     dateFormat = "%Y-%m-%d %H:%M:%S"
     
@@ -199,16 +213,18 @@ elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
            
 	
 elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
-#    if 'page' in args:
-#        page = int( args[ 'page' ][0] )
-#    else:
-#        page = 1
+    pageSize = 23 #ends with a full 5th row in Thumbnail view for AG
+    
+    if 'page' in args:
+        page = int( args[ 'page' ][0] )
+    else:
+        page = 0
 
-    for episode in sorted( getAPI( args['href'][0] ), key=lambda k: k['show']['title'].lower() ):
+    for episode in sorted( getAPI( args['href'][0] + '?limit=' + str( pageSize ) + '&start=' + str( page * pageSize ) ), key=lambda k: k['show']['title'].lower() ):
         show = episode['show']
         addDirectoryItem( {'mode': 'play', 'href': episode['mirrors'][0]['video_url'] }, episode['episode_number'] + ' - ' + show['title'], getImgURL( show['id'] ), False, {}, getShowInfo( show ) )
 
-#    addDirectoryItem( { 'mode': 'latest', 'page': str( page + 1 ) }, 'More', 'DefaultFolder.png', True ) #Add a More link to get more results
+    addDirectoryItem( { 'mode': 'latest', 'page': str( page + 1 ), 'href': 'recent/episodes' }, 'More', 'DefaultFolder.png', True ) #Add a More link to get more results
      
 elif mode[0] == 'list': #List videos linked at the series/movie endpoint
     show = getAPI( args['href'][0] ) 
@@ -217,8 +233,9 @@ elif mode[0] == 'list': #List videos linked at the series/movie endpoint
         listMirrorsAPI( 'shows/' + show['id'] + '/episode/1', show['title'] )
         
     else:
-        episodes = show['episodes']
+        linkRelated( show['prequels'], 'Prequel' )
         
+        episodes = show['episodes']
         for key in sorted( episodes, key=int ):
             if episodes[key] is None:
                 title = key + ' - ' + show['title']
@@ -226,8 +243,12 @@ elif mode[0] == 'list': #List videos linked at the series/movie endpoint
             else:
                 title = key + ' - ' + episodes[key] + ': ' + show['title']
 
-            addDirectoryItem( { 'mode': 'watch', 'href': 'shows/' + show['id'] + '/episode/' + key, 'title': fixEncoding( title ) }, title, 'DefaultFolder.png', True )
-
+            addDirectoryItem( { 'mode': 'watch', 'href': 'shows/' + show['id'] + '/episode/' + key, 'title': fixEncoding( title ) }, fixEncoding( title ), 'DefaultFolder.png', True )
+        
+        linkRelated( show['sequels'], 'Sequel' )
+        linkRelated( show['related'], 'Related' )
+        
+            
 elif mode[0] == 'watch': #get available videos from video page
     mirrorsInfo = listMirrorsAPI( args['href'][0], args['title'][0] )
     
