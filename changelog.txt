@@ -1,3 +1,19 @@
+v 0.3.4
+==============
+myanimelist ID used when present to lookup Episode titles. 
+
+v 0.3.3
+==============
+extended functionality to leverage API results further.
+
+v 0.3.2
+==============
+Added back some features first offical API lost. Basically the same capabilities of 0.3.0 again.
+
+v 0.3.1
+===============
+official API is here! Lost some features for the moment, but working to get them back.
+
 v 0.3.0
 ===============
 added support to scrape all available mirrors of a video

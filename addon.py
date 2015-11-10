@@ -73,7 +73,7 @@ def build_url( query ):
 def fixEncoding( str ): #fix character encoding and parse HTML
     if str is None:
         str = ''
-        
+    
     return HTMLParser.HTMLParser().unescape( str.encode('utf-8') ) 
 
 def play( href ):
@@ -92,7 +92,33 @@ def getYQLAlias( alias, query={} ):
             links = [ links ]
     
     return links
-  	
+
+def YQL( url, xpath ): # run a query against YQL, returns a content JSON
+    req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20html%20where%20url=%22' + url  + '%22%20and%20xpath=%27' + xpath + '%27' )
+    reqContent = urllib2.urlopen( req )
+    
+    return json.load( reqContent, 'utf-8' )
+
+def scrapeMALEpisodes( malID, title ):
+    print( 'MAL Scraping: ' + title )
+    results = YQL( 'myanimelist.net/anime/' + malID + '/e/episode', '//tr[contains(@class,%22episode-list-data%22)]' )
+    
+    episodes = {}
+    if results[ 'query' ][ 'results' ] != None and results[ 'query' ][ 'results' ][ 'tr' ] != None:
+        if isinstance( results[ 'query' ][ 'results' ][ 'tr' ], list ):
+            for episode in results[ 'query' ][ 'results' ][ 'tr' ]:
+                episodeID = episode[ 'td' ][ 0 ]['content']
+                episodeTitle = episode[ 'td' ][ 1 ][ 'a' ]['content']
+                episodes[ episodeID ] = episodeTitle.replace( "&#039;", "\'" )
+        
+        else:
+            episode = results[ 'query' ][ 'results' ][ 'tr' ]
+            episodeID = episode[ 'td' ][ 0 ]['content']
+            episodeTitle = episode[ 'td' ][ 1 ][ 'a' ]['content']
+            episodes[ episodeID ] = episodeTitle.replace( "&#039;", "\'" )
+    
+    return episodes
+
 def getAPI( endpoint ):
     req = urllib2.Request( api_base + endpoint )
     reqContent = urllib2.urlopen( req )
@@ -235,13 +261,21 @@ elif mode[0] == 'list': #List videos linked at the series/movie endpoint
     else:
         linkRelated( show['prequels'], 'Prequel' )
         
+        malEpisodes = {}
+        if show['myanimelist'] != None:
+            malEpisodes = scrapeMALEpisodes( show['myanimelist'], show['title'] )
+            
         episodes = show['episodes']
+        
         for key in sorted( episodes, key=int ):
-            if episodes[key] is None:
+            if key in malEpisodes:
+                title = key + ' - ' + malEpisodes[ key ]
+                
+            elif episodes[key] is None:
                 title = key + ' - ' + show['title']
                 
             else:
-                title = key + ' - ' + episodes[key] + ': ' + show['title']
+                title = key + ' - ' + episodes[key]
 
             addDirectoryItem( { 'mode': 'watch', 'href': 'shows/' + show['id'] + '/episode/' + key, 'title': fixEncoding( title ) }, fixEncoding( title ), 'DefaultFolder.png', True )
         
@@ -257,7 +291,6 @@ elif mode[0] == 'watch': #get available videos from video page
         play( mirrorsInfo['mirrors'][0]['video_url'] )
     #elif len( mirrorsInfo['mirrors'] ) == 0:
         #TODO: no playable mirrors
-        
     
 elif mode[0] == 'play': #Watch the selected show from list view
     play( args['href'][0] )
