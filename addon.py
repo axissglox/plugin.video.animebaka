@@ -246,7 +246,8 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     else:
         page = 0
 
-    for episode in sorted( getAPI( args['href'][0] + '?limit=' + str( pageSize ) + '&start=' + str( page * pageSize ) ), key=lambda k: k['show']['title'].lower() ):
+    for episode in getAPI( args['href'][0] + '?limit=' + str( pageSize ) + '&start=' + str( page * pageSize ) ): 
+        #print( 'Show: ' + episode['show']['title'])
         show = episode['show']
         addDirectoryItem( {'mode': 'play', 'href': episode['mirrors'][0]['video_url'] }, episode['episode_number'] + ' - ' + show['title'], getImgURL( show['id'] ), False, {}, getShowInfo( show ) )
 
