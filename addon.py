@@ -44,7 +44,7 @@ defaultOpts = (
     { 'label': 'Movies', 'href': 'type/Movie', 'mode': 'browse' }    
 )
 	
-def addDirectoryItem( urlParams, title, img, isFolder, streamInfo={}, setInfo={} ):
+def addDirectoryItem( urlParams, title, img, isFolder, streamInfo={}, setInfo={}, contextMenu=[] ):
     url = build_url( urlParams )
     try:
         li = xbmcgui.ListItem( fixEncoding( title ), iconImage=img, thumbnailImage=img )
@@ -56,7 +56,8 @@ def addDirectoryItem( urlParams, title, img, isFolder, streamInfo={}, setInfo={}
 
     for key, value in setInfo.items():
         li.setInfo( key, value )
-        
+    
+    li.addContextMenuItems( contextMenu )
     xbmcplugin.addDirectoryItem( addon_handle, url, li, isFolder )
 
     return li
@@ -246,10 +247,18 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     else:
         page = 0
 
-    for episode in getAPI( args['href'][0] + '?limit=' + str( pageSize ) + '&start=' + str( page * pageSize ) ): 
-        #print( 'Show: ' + episode['show']['title'])
-        show = episode['show']
-        addDirectoryItem( {'mode': 'play', 'href': episode['mirrors'][0]['video_url'] }, episode['episode_number'] + ' - ' + show['title'], getImgURL( show['id'] ), False, {}, getShowInfo( show ) )
+    for episode in getAPI( args['href'][0] + '?limit=' + str( pageSize ) + '&start=' + str( page * pageSize ) ):
+        if len( episode['mirrors'] ) > 0:
+            show = episode['show']
+            showLink = sys.argv[0] + '?mode=list&href=shows/' + show['id']
+            contextMenu = [ ( 'Go to ' + fixEncoding( show['title'] ), 'Container.Update(' + showLink + ')' )]
+            addDirectoryItem( {'mode': 'play', 'href': episode['mirrors'][0]['video_url'] }, 
+                             episode['episode_number'] + ' - ' + show['title'], getImgURL( show['id'] ), 
+                             False, 
+                             {}, 
+                             getShowInfo( show ), 
+                             contextMenu )
+            
 
     addDirectoryItem( { 'mode': 'latest', 'page': str( page + 1 ), 'href': 'recent/episodes' }, 'More', 'DefaultFolder.png', True ) #Add a More link to get more results
      
