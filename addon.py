@@ -1,3 +1,4 @@
+# API doc http://animebaka.tv/page/api-documentation
 #v1 API http://animebaka.tv/api/v1/
 #GET /shows
 #GET /shows/{id} // Numeric ID of show
@@ -13,6 +14,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
+import base64
 import json
 import re
 import HTMLParser
@@ -77,9 +79,19 @@ def fixEncoding( str ): #fix character encoding and parse HTML
     
     return HTMLParser.HTMLParser().unescape( str.encode('utf-8') ) 
 
-def play( href ):
-    videoLink = getYQLAlias( 'download_video', {'videoHREF': href } )
-    xbmc.Player().play( videoLink[0]['href'] ) #scrape the file link on file host and play
+def play( video_code ):
+    #videoLink = getYQLAlias( 'download_video', {'videoHREF': href } )
+    req = urllib2.Request( 'https://bakavideo.tv/get/files.view?f=' + video_code ) #https://bakavideo.tv/get/files.view?f=pak1ztq05hjk
+    reqContent = urllib2.urlopen( req )
+    results = json.load( reqContent, 'utf-8' )
+    
+    content = base64.b64decode( results['content'] )
+    urls = re.findall(r'href=[\'"]?([^\'" >]+)', content)
+    
+    for href in urls:
+        if video_code in href:
+            xbmc.Player().play( href ) #scrape the file link on file host and play
+            break
 
 def getYQLAlias( alias, query={} ):
     req = urllib2.Request( 'http://query.yahooapis.com/v1/public/yql/animebaka_show/animebaka_' + alias + '?format=json&' + urllib.urlencode( query ) )
@@ -143,9 +155,18 @@ def listMirrorsAPI( href, title ):
             if streamInfo['subtitle']['language'] != 'en':
                 subDub = ''
                 
-            li = addDirectoryItem( {'mode': 'play', 'href': mirror['video_url'] }, title + ' ' + fixEncoding( subDub ), 'DefaultVideo.png', False, streamInfo )
+            li = addDirectoryItem( {'mode': 'play', 'href': mirror['video_code'] }, title + ' ' + fixEncoding( subDub ), 'DefaultVideo.png', False, streamInfo )
     
     return { 'mirrors': episode['mirrors'], 'li': li }
+
+def filterMirrors( mirrors ):
+    bakaVideos = []
+    
+    for mirror in mirrors:
+        if mirror['service'] == 'BakaVideo':
+            bakaVideos.append( mirror )
+    
+    return bakaVideos
 
 def extractStreamInfo( mirror ):
     streamInfo = {}
@@ -252,7 +273,10 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
             show = episode['show']
             showLink = sys.argv[0] + '?mode=list&href=shows/' + show['id']
             contextMenu = [ ( 'Go to ' + fixEncoding( show['title'] ), 'Container.Update(' + showLink + ')' )]
-            addDirectoryItem( {'mode': 'play', 'href': episode['mirrors'][0]['video_url'] }, 
+            bakaVideos = filterMirrors( episode['mirrors'] )
+            
+            if len( bakaVideos ) > 0:
+                addDirectoryItem( {'mode': 'play', 'href': bakaVideos[0]['video_code'] }, 
                              episode['episode_number'] + ' - ' + show['title'], getImgURL( show['id'] ), 
                              False, 
                              {}, 
@@ -298,7 +322,7 @@ elif mode[0] == 'watch': #get available videos from video page
     
     if len( mirrorsInfo['mirrors'] ) == 1: #if only 1, play it
         xbmcplugin.setResolvedUrl( addon_handle, False, mirrorsInfo['li'] )
-        play( mirrorsInfo['mirrors'][0]['video_url'] )
+        play( mirrorsInfo['mirrors'][0]['video_code'] )
     #elif len( mirrorsInfo['mirrors'] ) == 0:
         #TODO: no playable mirrors
     

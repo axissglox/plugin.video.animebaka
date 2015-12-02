@@ -1,3 +1,8 @@
+v 0.3.7
+=============
+Bakavideo.TV changed, changed scraping to fit new reality
+Fixed bug in latest with multiple mirrors, but first is not in a playable location
+
 v 0.3.6
 =============
 Fixed Latest bug where 0 mirrors are listed.
