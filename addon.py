@@ -65,7 +65,7 @@ def addDirectoryItem( urlParams, title, img, isFolder, streamInfo={}, setInfo={}
     return li
 
 def getImgURL( showID ):
-    return 'http://images.animebaka.tv/a_lth/' + showID + '_lth.jpg' #large thumb
+    return 'http://images.animebaka.tv/a_lth/' + str( showID ) + '_lth.jpg' #large thumb
     
 def build_url( query ):
     if 'href' in query:
@@ -114,7 +114,7 @@ def YQL( url, xpath ): # run a query against YQL, returns a content JSON
 
 def scrapeMALEpisodes( malID, title ):
     print( 'MAL Scraping: ' + title )
-    results = YQL( 'myanimelist.net/anime/' + malID + '/e/episode', '//tr[contains(@class,%22episode-list-data%22)]' )
+    results = YQL( 'myanimelist.net/anime/' + str( malID ) + '/e/episode', '//tr[contains(@class,%22episode-list-data%22)]' )
     
     episodes = {}
     if results[ 'query' ][ 'results' ] != None and results[ 'query' ][ 'results' ][ 'tr' ] != None:
@@ -142,10 +142,11 @@ def getAPI( endpoint ):
 def linkRelated( collection, label ):
     if isinstance( collection, dict ):
         for showID in collection.keys():
-            addDirectoryItem( { 'mode': 'list', 'href': 'shows/' + showID, 'title': fixEncoding( collection[showID] ) }, label + ': ' + fixEncoding( collection[showID] ), getImgURL( showID ), True )
+            addDirectoryItem( { 'mode': 'list', 'href': 'shows/' + str( showID ), 'title': fixEncoding( collection[showID] ) }, label + ': ' + fixEncoding( collection[showID] ), getImgURL( showID ), True )
 
 def listMirrorsAPI( href, title ):
     episode = getAPI( href )
+    li = None
     
     for mirror in episode['mirrors']:
         if mirror['service'] == 'BakaVideo':
@@ -257,7 +258,7 @@ elif mode[0] == 'browse': #Browse links, based on the animebaka.tv menu
             
         for show in sorted( getAPI( args['href'][0] ), key=lambda k: k['title'].lower() ):
             if re.match( filterAlpha, show['title'] ):
-                addDirectoryItem( {'mode': 'list', 'href': 'shows/' + show['id'] }, show['title'], getImgURL( show['id'] ), True, {}, getShowInfo( show ) )
+                addDirectoryItem( {'mode': 'list', 'href': 'shows/' + str( show['id'] )}, show['title'], getImgURL( show['id'] ), True, {}, getShowInfo( show ) )
            
 	
 elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
@@ -271,13 +272,13 @@ elif mode[0] == 'latest': #pages of latest results from animebaka.tv front page
     for episode in getAPI( args['href'][0] + '?limit=' + str( pageSize ) + '&start=' + str( page * pageSize ) ):
         if len( episode['mirrors'] ) > 0:
             show = episode['show']
-            showLink = sys.argv[0] + '?mode=list&href=shows/' + show['id']
+            showLink = sys.argv[0] + '?mode=list&href=shows/' + str( show['id'] )
             contextMenu = [ ( 'Go to ' + fixEncoding( show['title'] ), 'Container.Update(' + showLink + ')' )]
             bakaVideos = filterMirrors( episode['mirrors'] )
             
             if len( bakaVideos ) > 0:
                 addDirectoryItem( {'mode': 'play', 'href': bakaVideos[0]['video_code'] }, 
-                             episode['episode_number'] + ' - ' + show['title'], getImgURL( show['id'] ), 
+                             str( episode['episode_number'] ) + ' - ' + show['title'], getImgURL( show['id'] ), 
                              False, 
                              {}, 
                              getShowInfo( show ), 
@@ -301,13 +302,13 @@ elif mode[0] == 'list': #List videos linked at the series/movie endpoint
             
         episodes = show['episodes']
         
-        for key in sorted( episodes, key=int ):
+        for key in sorted( episodes, key=float ):
             if key in malEpisodes:
                 title = key + ' - ' + malEpisodes[ key ]
-                
+
             elif episodes[key] is None:
                 title = key + ' - ' + show['title']
-                
+
             else:
                 title = key + ' - ' + episodes[key]
 

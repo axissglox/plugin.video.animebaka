@@ -1,3 +1,11 @@
+v 0.3.9
+=============
+Started getting int to string errors for mostly showIDs sent by API. fixed as it was crashing 
+
+v 0.3.8
+=============
+Added support for floating point episode numbers, e.g. 11.5 etc
+
 v 0.3.7
 =============
 Bakavideo.TV changed, changed scraping to fit new reality
